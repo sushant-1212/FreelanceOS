@@ -1,0 +1,246 @@
+{
+  "name": "5. Project Closure, Testimonials & Business Analytics",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "826f34e8-0e92-4d00-b8b3-a8b37b66650b",
+      "name": "Trigger: Project Closed",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "subject": "Would you share a quick testimonial?",
+        "message": "=Hi {{ $json.clientName }}, it was a pleasure working together! Would you mind sharing a short testimonial? [form link]",
+        "toList": [
+          "sushantferia11@gmail.com"
+        ],
+        "additionalFields": {}
+      },
+      "id": "e07f498e-101d-4f73-9fd9-2d82f436a7df",
+      "name": "Request Testimonial",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bqcZiMn4lvCKMa3K",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "testimonial-submit",
+        "options": {}
+      },
+      "id": "18c429ba-917f-4780-9f3c-3ac4c41e0e8f",
+      "name": "Testimonial Form Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        224,
+        160
+      ],
+      "webhookId": "bdc79621-1bd3-40bb-bcb4-4b550e368a8c"
+    },
+    {
+      "parameters": {
+        "url": "https://api.notion.com/v1/pages",
+        "options": {}
+      },
+      "id": "63cbcefc-ed53-4a33-9714-aabcb97edff5",
+      "name": "Update Portfolio (Notion API)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [
+        448,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks"
+            }
+          ]
+        }
+      },
+      "id": "d9b3289b-e73a-493a-86e5-8a189c4a1831",
+      "name": "Weekly Analytics Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT SUM(amount) as earnings, COUNT(*) as projects, AVG(rating) as retention \nFROM projects WHERE closed_at > NOW() - INTERVAL '7 days';",
+        "additionalFields": {}
+      },
+      "id": "f3aa8cf3-eb9e-4946-8823-d7e1973d8f47",
+      "name": "Aggregate Business Data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        224,
+        352
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "rGqoXtPf1qO1I5nf",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "prompt": {
+          "messages": [
+            {
+              "content": "=You are a business analytics assistant. Based on this weekly data, write a short, encouraging business insight summary for a freelancer.  Total Earnings (last 7 days): {{ $json.earnings }} Projects Completed: {{ $json.projects }} Average Client Rating: {{ $json.retention }}  Write 2-3 sentences highlighting performance and one suggestion for improvement."
+            }
+          ]
+        },
+        "options": {},
+        "requestOptions": {}
+      },
+      "id": "4b0a1706-4604-448d-8a1d-5cae93101fc6",
+      "name": "AI Business Insight",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        448,
+        352
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "ii0Z6LYZMT8hhxhp",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "subject": "Your Weekly Business Health Report",
+        "message": "={{ $json.message.content }}",
+        "toList": [
+          "sushantferia11@gmail.com"
+        ],
+        "additionalFields": {}
+      },
+      "id": "187954d7-7503-43f6-973d-2c3503cc95f3",
+      "name": "Send Weekly Business Report",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        672,
+        352
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bqcZiMn4lvCKMa3K",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {
+    "Trigger: Project Closed": [
+      {
+        "json": {
+          "clientName": "Test Client",
+          "clientEmail": "sushantferia11@gmail.com",
+          "projectTitle": "Homepage Redesign Project"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Trigger: Project Closed": {
+      "main": [
+        [
+          {
+            "node": "Request Testimonial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Testimonial Form Webhook": {
+      "main": [
+        [
+          {
+            "node": "Update Portfolio (Notion API)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weekly Analytics Trigger": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Business Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Business Data": {
+      "main": [
+        [
+          {
+            "node": "AI Business Insight",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Business Insight": {
+      "main": [
+        [
+          {
+            "node": "Send Weekly Business Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "430e29d6-c7cb-4f69-b715-fb5babe3af1a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8d6ec7c109f70d5d1aac919abc1968ef5cf4eae8b608d3cb5a15a615d0e2b26e"
+  },
+  "nodeGroups": [],
+  "id": "9b1A4QKtl9mOaqQR",
+  "tags": []
+}

@@ -1,0 +1,274 @@
+{
+  "name": "3. Project Milestone Tracking & Client Updates",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "id": "56b92f30-81b8-4a5d-bfdc-b79adecad662",
+      "name": "Daily Milestone Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        -656,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, project_id, milestone_name, due_date, status, client_email, client_name\nFROM milestones\nWHERE status != 'completed' AND due_date <= CURRENT_DATE\nORDER BY due_date ASC;",
+        "additionalFields": {}
+      },
+      "id": "9fb75a5a-4008-42f8-9f48-0327ad7d8773",
+      "name": "Fetch Active Milestones",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        -448,
+        80
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "rGqoXtPf1qO1I5nf",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "prompt": {
+          "messages": [
+            {
+              "content": "=You are a project management assistant. Write a short, friendly progress update for the client based on this milestone data.  Milestone: {{ $json.milestone_name }} Status: {{ $json.status }} Due Date: {{ $json.due_date }} Client Name: {{ $json.client_name }}  Write 2-3 sentences summarizing progress and next steps."
+            }
+          ]
+        },
+        "options": {},
+        "requestOptions": {}
+      },
+      "id": "fc04335b-d571-4db4-a57f-9d26729da265",
+      "name": "AI Progress Summary",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        0
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "ii0Z6LYZMT8hhxhp",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "subject": "Project Update",
+        "message": "={{ $json.message.content }}",
+        "toList": [
+          "sushantferia11@gmail.com"
+        ],
+        "additionalFields": {}
+      },
+      "id": "8f23c45c-1fa3-4e89-9804-08ad8383a4e9",
+      "name": "Send Client Update",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bqcZiMn4lvCKMa3K",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "5130397c-599e-486b-91b1-8b3b08ecc770",
+      "name": "Milestone Overdue?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        0,
+        192
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "channel": "#project-alerts",
+        "text": "=Milestone overdue: {{ $json.milestoneName }} for {{ $json.clientName }}",
+        "otherOptions": {},
+        "attachments": []
+      },
+      "id": "34451803-c45d-4448-a2d2-1de7dc87a699",
+      "name": "Overdue Alert (Slack)",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [
+        224,
+        192
+      ],
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "SgypJWIM7bHOiqAk",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "append",
+        "sheetId": "1oSwnX-sU7RSR5dVeCWBuD4CbYrNJNiHe-UxVLmdIzWo",
+        "options": {}
+      },
+      "id": "c392b601-c6c9-4ed0-a737-ab66bd1cb3a4",
+      "name": "Audit Log Entry",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "OAkQlkKtO2r77QOm",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "c509e1f3-023e-430c-a643-bc35e9cfd36e",
+      "name": "Error Trigger (Retry Logic)",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        -448,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "channel": "#pipeline-errors",
+        "text": "=Workflow failed: {{ $json.workflow.name }} - {{ $json.execution.error.message }}",
+        "otherOptions": {},
+        "attachments": []
+      },
+      "id": "054b452c-0331-45e9-8426-d8e3f455b6f8",
+      "name": "Retry / Notify on Failure",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [
+        -224,
+        288
+      ],
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "SgypJWIM7bHOiqAk",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Daily Milestone Check": {
+      "main": [
+        [
+          {
+            "node": "Fetch Active Milestones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Active Milestones": {
+      "main": [
+        [
+          {
+            "node": "AI Progress Summary",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Milestone Overdue?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Progress Summary": {
+      "main": [
+        [
+          {
+            "node": "Send Client Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Client Update": {
+      "main": [
+        [
+          {
+            "node": "Audit Log Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Milestone Overdue?": {
+      "main": [
+        [
+          {
+            "node": "Overdue Alert (Slack)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Trigger (Retry Logic)": {
+      "main": [
+        [
+          {
+            "node": "Retry / Notify on Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "8d993905-10e9-4893-b039-ca2ab9042644",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8d6ec7c109f70d5d1aac919abc1968ef5cf4eae8b608d3cb5a15a615d0e2b26e"
+  },
+  "nodeGroups": [],
+  "id": "dS7gKmMjEYvvWwzC",
+  "tags": []
+}

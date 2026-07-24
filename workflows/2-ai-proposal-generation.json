@@ -1,0 +1,326 @@
+{
+  "name": "2. AI Proposal Generation & Client Communication",
+  "nodes": [
+    {
+      "parameters": {
+        "returnOutput": "allRuns"
+      },
+      "id": "0c04ab66-11e4-4f75-9387-eb26006f3857",
+      "name": "Trigger: Qualified Lead",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        -736,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT p.title, p.amount, p.rating, c.name AS client_name, c.brief\nFROM projects p\nJOIN clients c ON p.client_id = c.id\nWHERE p.closed_at IS NOT NULL\nORDER BY p.closed_at DESC\nLIMIT 5;",
+        "additionalFields": {}
+      },
+      "id": "8fe1024e-782d-4bd1-89e3-187dbcef1288",
+      "name": "Fetch Past Similar Projects",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        -512,
+        288
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "rGqoXtPf1qO1I5nf",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "prompt": {
+          "messages": [
+            {
+              "content": "=You are a professional freelance proposal writer. Based on the client's requirements and past similar project examples below, write a personalized, concise client proposal including scope, timeline, and approach.  Client requirement: {{ $('Trigger: Qualified Lead').item.json.clientRequirements }}  Past similar projects: {{ JSON.stringify($('Fetch Past Similar Projects').all().map(i => i.json)) }}"
+            }
+          ]
+        },
+        "options": {},
+        "requestOptions": {}
+      },
+      "id": "acfbaedd-824b-4421-97b8-6ab562a1687a",
+      "name": "AI Generate Proposal",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        -288,
+        208
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "ii0Z6LYZMT8hhxhp",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "message",
+        "requestOptions": {}
+      },
+      "id": "4182ab72-671c-4ff4-aeca-40bef755f18e",
+      "name": "AI Pricing Suggestion",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        -288,
+        400
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "ii0Z6LYZMT8hhxhp",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "19a95833-0c47-411b-b7fd-d124d715dfca",
+      "name": "Approved?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        160,
+        288
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "subject": "Your Project Proposal",
+        "message": "={{ $('AI Generate Proposal').item.json.message }}",
+        "toList": [
+          "sushantferia11@gmail.com"
+        ],
+        "additionalFields": {}
+      },
+      "id": "7d5129e5-dacb-4bf6-96ae-d94173a3969f",
+      "name": "Send Proposal Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        368,
+        208
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bqcZiMn4lvCKMa3K",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 10,
+        "unit": "seconds"
+      },
+      "id": "f2039aa7-09a1-461a-ac96-45323141c01f",
+      "name": "Wait 3 Days",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [
+        592,
+        208
+      ],
+      "webhookId": "8529729c-b20f-4029-be9b-8ec128b6c97d"
+    },
+    {
+      "parameters": {},
+      "id": "041c11c8-550f-483e-a758-dc7903f3df2b",
+      "name": "Client Responded?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        816,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "subject": "Following up on your proposal",
+        "message": "=Hi {{ $json.clientName }}, just checking in on the proposal I sent over. Happy to answer any questions!",
+        "additionalFields": {}
+      },
+      "id": "aa473180-e62c-4a09-bab7-3d454fdfad80",
+      "name": "Follow-up Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        208
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bqcZiMn4lvCKMa3K",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "sendAndWait",
+        "user": {
+          "__rl": true,
+          "value": "U0BJYHR4ZN3",
+          "mode": "list",
+          "cachedResultName": "sushantferia11"
+        },
+        "message": "=New proposal ready for review:\n\n{{ $('AI Generate Proposal').item.json.message.content }}\n\n\n\nPlease approve or reject.",
+        "approvalOptions": {
+          "values": {}
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        -48,
+        288
+      ],
+      "id": "155ef528-8574-4d6b-bad6-63bf45deb35f",
+      "name": "Send message and wait for response",
+      "webhookId": "e4bf0608-881d-498c-abfe-202fccb3d4f4",
+      "credentials": {
+        "slackOAuth2Api": {
+          "id": "SgypJWIM7bHOiqAk",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Trigger: Qualified Lead": {
+      "main": [
+        [
+          {
+            "node": "Fetch Past Similar Projects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Past Similar Projects": {
+      "main": [
+        [
+          {
+            "node": "AI Generate Proposal",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "AI Pricing Suggestion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Generate Proposal": {
+      "main": [
+        [
+          {
+            "node": "Send message and wait for response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Pricing Suggestion": {
+      "main": [
+        [
+          {
+            "node": "Send message and wait for response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approved?": {
+      "main": [
+        [
+          {
+            "node": "Send Proposal Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Proposal Email": {
+      "main": [
+        [
+          {
+            "node": "Wait 3 Days",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 3 Days": {
+      "main": [
+        [
+          {
+            "node": "Client Responded?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Client Responded?": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Follow-up Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message and wait for response": {
+      "main": [
+        [
+          {
+            "node": "Approved?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "cf7003d2-a74f-4a56-bbeb-73746fc8dcd2",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8d6ec7c109f70d5d1aac919abc1968ef5cf4eae8b608d3cb5a15a615d0e2b26e"
+  },
+  "nodeGroups": [],
+  "id": "989BM4Q5uzDOnjOf",
+  "tags": []
+}

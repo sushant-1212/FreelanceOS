@@ -1,0 +1,320 @@
+{
+  "name": "4. Invoice Generation & Payment Follow-up",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "a7ff0203-4a02-461c-a3f2-7185f953d959",
+      "name": "Trigger: Milestone Complete",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const invoice = {\n  invoiceId: 'INV-' + Date.now(),\n  client: $json.clientName,\n  amount: $json.milestoneAmount,\n  dueDate: new Date(Date.now() + 7*24*60*60*1000).toISOString(),\n};\nreturn [{ json: invoice }];"
+      },
+      "id": "2b05e9af-06bf-4833-ae80-b6d5943e9ddd",
+      "name": "Generate Invoice (Code)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        224,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "subject": "Invoice for your project",
+        "message": "=Invoice {{ $json.invoiceId }}: {{ $json.amount }} due {{ $json.dueDate }}. Pay here: [payment link]",
+        "additionalFields": {}
+      },
+      "id": "047329f2-24e5-4e6b-882e-e267446783f1",
+      "name": "Send Invoice Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        448,
+        0
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bqcZiMn4lvCKMa3K",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "id": "360c35a9-4439-4c45-9acb-e3f0bb4498b0",
+      "name": "Daily Unpaid Invoice Check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT id, project_id, invoice_id, amount, status, days_overdue, client_email, client_name\nFROM invoices\nWHERE status != 'paid' AND days_overdue >= 3\nORDER BY days_overdue DESC;",
+        "additionalFields": {}
+      },
+      "id": "b0dd53c9-f832-4df4-8731-1cbd69a5b9c1",
+      "name": "Fetch Payment History",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 1,
+      "position": [
+        224,
+        208
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "rGqoXtPf1qO1I5nf",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "prompt": {
+          "messages": [
+            {
+              "content": "=You are a payment risk assessment assistant. Based on this client's payment history and current invoice, flag them as Low Risk, Medium Risk, or High Risk.  Client: {{ $json.client_name }} Invoice Amount: {{ $json.amount }} Days Overdue: {{ $json.days_overdue }} Status: {{ $json.status }}  Return a short risk assessment with reasoning."
+            }
+          ]
+        },
+        "options": {},
+        "requestOptions": {}
+      },
+      "id": "6617257b-37f3-4d2e-b783-9ff059f91159",
+      "name": "AI Payment Risk Flag",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        448,
+        208
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "ii0Z6LYZMT8hhxhp",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "value1": "={{ $('Fetch Payment History').item.json.days_overdue }}",
+        "rules": {
+          "rules": [
+            {
+              "operation": "largerEqual",
+              "value2": 14
+            },
+            {
+              "operation": "largerEqual",
+              "value2": 7,
+              "output": 1
+            },
+            {
+              "operation": "largerEqual",
+              "value2": 3,
+              "output": 2
+            }
+          ]
+        }
+      },
+      "id": "716f050a-e656-4109-ad65-c4c3fec679c7",
+      "name": "Escalation Tier (Days Overdue)",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        672,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "subject": "Friendly reminder: Invoice due",
+        "message": "=Hi {{ $json.clientName }}, just a friendly reminder that invoice {{ $json.invoiceId }} is due.",
+        "toList": [
+          "sushantferia11@gmail.com"
+        ],
+        "additionalFields": {}
+      },
+      "id": "1ce56dab-23a6-4c4a-96a4-bc9fd580c87a",
+      "name": "Reminder - Day 3 (Gentle)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        912,
+        -48
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bqcZiMn4lvCKMa3K",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "subject": "Invoice overdue",
+        "message": "=Hi {{ $json.clientName }}, invoice {{ $json.invoiceId }} is now 7 days overdue. Please arrange payment at your earliest convenience.",
+        "toList": [
+          "sushantferia11@gmail.com"
+        ],
+        "additionalFields": {}
+      },
+      "id": "32467ade-d9ec-4095-be0f-19cac310a78c",
+      "name": "Reminder - Day 7 (Firm)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        912,
+        160
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bqcZiMn4lvCKMa3K",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "subject": "Urgent: Invoice significantly overdue",
+        "message": "=Hi {{ $json.clientName }}, invoice {{ $json.invoiceId }} is 14 days overdue. Please contact us immediately to resolve.",
+        "toList": [
+          "sushantferia11@gmail.com"
+        ],
+        "additionalFields": {}
+      },
+      "id": "0ea211b5-d42c-4cb8-b7a7-6b4076ba08bf",
+      "name": "Reminder - Day 14 (Escalated)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [
+        912,
+        352
+      ],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "bqcZiMn4lvCKMa3K",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Trigger: Milestone Complete": {
+      "main": [
+        [
+          {
+            "node": "Generate Invoice (Code)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Invoice (Code)": {
+      "main": [
+        [
+          {
+            "node": "Send Invoice Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Unpaid Invoice Check": {
+      "main": [
+        [
+          {
+            "node": "Fetch Payment History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Payment History": {
+      "main": [
+        [
+          {
+            "node": "AI Payment Risk Flag",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Payment Risk Flag": {
+      "main": [
+        [
+          {
+            "node": "Escalation Tier (Days Overdue)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalation Tier (Days Overdue)": {
+      "main": [
+        [
+          {
+            "node": "Reminder - Day 14 (Escalated)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reminder - Day 7 (Firm)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reminder - Day 3 (Gentle)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "c4bc84e4-b45f-4c0a-be63-cc8560081afd",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8d6ec7c109f70d5d1aac919abc1968ef5cf4eae8b608d3cb5a15a615d0e2b26e"
+  },
+  "nodeGroups": [],
+  "id": "P6qtfmlj6IplZdmn",
+  "tags": []
+}
